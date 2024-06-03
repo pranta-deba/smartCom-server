@@ -28,6 +28,7 @@ async function run() {
     await client.connect();
     const db = client.db("smartCom");
     const usersCollection = db.collection("users");
+    const assetsCollection = db.collection("assets");
 
     /************ MIDDLEWARE API **************/
     const verifyToken = (req, res, next) => {
@@ -167,13 +168,6 @@ async function run() {
       verifyHr,
       async (req, res) => {
         const email = req.params.email;
-        
-        console.log("Route theke : ",req.decoded.email, email);
-
-        if (email !== req.decoded.email) {
-          return res.status(403).send({ message: "unauthorized access" });
-        }
-
         const hr = await usersCollection.findOne({ email: email });
         if (hr) {
           const all_employee = await usersCollection
@@ -184,7 +178,7 @@ async function run() {
       }
     );
 
-    // verified employee
+    //edit  verified employee
     app.put("/users/verified_employee/:id", async (req, res) => {
       const id = req.params.id;
       const employee = await usersCollection.findOne({ _id: new ObjectId(id) });
@@ -196,7 +190,74 @@ async function run() {
       res.send(result);
     });
 
-    /******************************* Payment ******************************************/
+    /******************************* Users ******************************************/
+
+
+    /******************************* assets ******************************************/
+    // add assets
+    app.post("/assets", async (req, res) => {
+      const data = req.body;
+      const result = await assetsCollection.insertOne(data);
+      res.send(result);
+    });
+    // all assets 
+    app.get("/assets", async (req, res) => {
+      const result = await assetsCollection.find({}).toArray();
+      res.send(result);
+    });
+    // search assets
+    // search volunteers by title and category
+    app.get("/assets-search", async (req, res) => {
+      const search = req.query.search;
+      let query = {
+        $or: [
+          {
+            product_name: { $regex: search, $options: "i" },
+          },
+          { status: { $regex: search, $options: "i" } },
+        ],
+      };
+      const result = await assetsCollection.find(query).toArray();
+      res.send(result);
+    });
+    
+
+    // delete assets
+    app.delete("/assets/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await assetsCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+    // // edit assets
+    // app.put("/assets/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const data = req.body;
+    //   const result = await assetsCollection.updateOne(
+    //     { _id: new ObjectId(id) },
+    //     { $set: data }
+    //   );
+    //   res.send(result);
+    // });
+    // // get assets by id
+    // app.get("/assets/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
+    //   res.send(result);
+    // });
+
+
+
+    // get assets by id
+    // app.get("/assets/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
+    //   res.send(result);
+    // });
+    // edit assets
+    /******************************* assets ******************************************/
+
+
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
