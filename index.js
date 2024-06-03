@@ -192,7 +192,6 @@ async function run() {
 
     /******************************* Users ******************************************/
 
-
     /******************************* assets ******************************************/
     // add assets
     app.post("/assets", async (req, res) => {
@@ -200,7 +199,7 @@ async function run() {
       const result = await assetsCollection.insertOne(data);
       res.send(result);
     });
-    // all assets 
+    // all assets
     app.get("/assets", async (req, res) => {
       const result = await assetsCollection.find({}).toArray();
       res.send(result);
@@ -220,32 +219,33 @@ async function run() {
       const result = await assetsCollection.find(query).toArray();
       res.send(result);
     });
-    
 
     // delete assets
     app.delete("/assets/:id", async (req, res) => {
       const id = req.params.id;
-      const result = await assetsCollection.deleteOne({ _id: new ObjectId(id) });
+      const result = await assetsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.send(result);
     });
     // // edit assets
-    // app.put("/assets/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const data = req.body;
-    //   const result = await assetsCollection.updateOne(
-    //     { _id: new ObjectId(id) },
-    //     { $set: data }
-    //   );
-    //   res.send(result);
-    // });
+    app.patch("/assets/:id", async (req, res) => {
+      const id = req.params.id;
+      const update = req.body;
+      const result = await assetsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: update },
+        { upsert: true }
+      );
+      res.json(result);
+    });
+
     // // get assets by id
     // app.get("/assets/:id", async (req, res) => {
     //   const id = req.params.id;
     //   const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
     //   res.send(result);
     // });
-
-
 
     // get assets by id
     // app.get("/assets/:id", async (req, res) => {
@@ -255,8 +255,6 @@ async function run() {
     // });
     // edit assets
     /******************************* assets ******************************************/
-
-
 
     await client.db("admin").command({ ping: 1 });
     console.log(
