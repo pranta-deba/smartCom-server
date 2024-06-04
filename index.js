@@ -29,6 +29,7 @@ async function run() {
     const db = client.db("smartCom");
     const usersCollection = db.collection("users");
     const assetsCollection = db.collection("assets");
+    const requestCollection = db.collection("requests");
 
     /************ MIDDLEWARE API **************/
     const verifyToken = (req, res, next) => {
@@ -255,6 +256,39 @@ async function run() {
     // });
     // edit assets
     /******************************* assets ******************************************/
+
+    /******************************* request ******************************************/
+    // request assets
+    app.post("/request", async (req, res) => {
+      const data = req.body;
+      const assets_id = data.assets_id;
+      const decreaseAssets = await assetsCollection.updateOne(
+        {
+          _id: new ObjectId(assets_id),
+        },
+        {
+          $inc: { quantity: -1 },
+        }
+      );
+      const result = await requestCollection.insertOne(data);
+      res.send(result);
+    });
+
+    // all request
+    app.get("/request", async (req, res) => {
+      const result = await requestCollection.find({}).toArray();
+      res.send(result);
+    });
+    // delete request
+    app.delete("/request/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await requestCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+    // edit request
+    /******************************* request ******************************************/
 
     await client.db("admin").command({ ping: 1 });
     console.log(
