@@ -205,7 +205,6 @@ async function run() {
       const result = await assetsCollection.find({}).toArray();
       res.send(result);
     });
-    // search assets
     // search volunteers by title and category
     app.get("/assets-search", async (req, res) => {
       const search = req.query.search;
@@ -242,11 +241,11 @@ async function run() {
     });
 
     // // get assets by id
-    // app.get("/assets/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
-    //   res.send(result);
-    // });
+    app.get("/assets/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
 
     // get assets by id
     // app.get("/assets/:id", async (req, res) => {
@@ -259,7 +258,7 @@ async function run() {
 
     /******************************* request ******************************************/
     // request assets
-    app.post("/request", async (req, res) => {
+    app.post("/request", verifyToken, verifyEmployee, async (req, res) => {
       const data = req.body;
       const assets_id = data.assets_id;
       const decreaseAssets = await assetsCollection.updateOne(
@@ -276,9 +275,11 @@ async function run() {
 
     // all request
     app.get("/request", async (req, res) => {
-      const result = await requestCollection.find({}).toArray();
+      const email = req.query.email;
+      const result = await requestCollection.find().toArray();
       res.send(result);
     });
+
     // delete request
     app.delete("/request/:id", async (req, res) => {
       const id = req.params.id;
