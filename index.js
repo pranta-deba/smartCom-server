@@ -162,6 +162,40 @@ async function run() {
         res.send(all_request);
       }
     });
+    // get all requested by hr
+    app.get("/request/requested", async (req, res) => {
+      const company = req.query.company;
+      const result = await requestCollection
+        .find({ "requestor.company_name": company })
+        .toArray();
+      res.send(result);
+    });
+
+    // search by email or name : hit by HR
+    app.get("/request/search", async (req, res) => {
+      const search = req.query.search;
+      const company = req.query.company;
+      let query = {
+        "requestor.company_name": company,
+        $or: [
+          { "requestor.email": { $regex: search, $options: "i" } },
+          { "requestor.name": { $regex: search, $options: "i" } },
+        ],
+      };
+      const result = await requestCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // approved : hit by HR
+    app.patch("/request/approved/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await requestCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "approved", approval_date: new Date() } }
+      );
+      res.send(result);
+    });
+
     //all  employee
     app.get(
       "/users/all-employees/:email",
@@ -178,6 +212,14 @@ async function run() {
         }
       }
     );
+    //all team member
+    app.get("/request/team", verifyToken, async (req, res) => {
+      const company = req.query.company;
+      const teams = await usersCollection
+        .find({ company_name: company })
+        .toArray();
+      res.send(teams);
+    });
 
     //edit  verified employee
     app.put("/users/verified_employee/:id", async (req, res) => {
@@ -288,7 +330,19 @@ async function run() {
       });
       res.send(result);
     });
-    // edit request
+    // search request
+    app.get("/request-search", async (req, res) => {
+      const search = req.query.search;
+      let query = {
+        $or: [
+          {
+            product_name: { $regex: search, $options: "i" },
+          },
+        ],
+      };
+      const result = await requestCollection.find(query).toArray();
+      res.send(result);
+    });
     /******************************* request ******************************************/
 
     await client.db("admin").command({ ping: 1 });
