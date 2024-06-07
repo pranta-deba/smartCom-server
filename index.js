@@ -25,11 +25,12 @@ const client = new MongoClient(url, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db("smartCom");
     const usersCollection = db.collection("users");
     const assetsCollection = db.collection("assets");
     const requestCollection = db.collection("requests");
+    const noticeCollection = db.collection("notices");
 
     /************ MIDDLEWARE API **************/
     const verifyToken = (req, res, next) => {
@@ -122,17 +123,53 @@ async function run() {
       res.send(result);
     });
 
-    // create hr
+    // create hr : hit by hr
     app.post("/users/hr", async (req, res) => {
       const data = req.body;
+      const hr = await usersCollection.findOne({ email: data.email });
+      if (hr) {
+        const totalMembers = parseInt(hr.members) + parseInt(data.members);
+        const totalRate =
+          parseInt(hr.packages_rate) + parseInt(data.packages_rate);
+        const updated = await usersCollection.updateOne(
+          { email: data.email },
+          {
+            $set: {
+              members: totalMembers,
+              transactionId: data.transactionId,
+              expiration_date: data.expiration_date,
+              packages_rate: totalRate,
+            },
+          }
+        );
+        return res.send(updated);
+      }
       const addedRole = { ...data, role: "HR", verified: true };
       const result = await usersCollection.insertOne(addedRole);
       res.send(result);
     });
 
-    // create employee
+    // update user
+    app.patch("/users/update", async (req, res) => {
+      const data = req.body;
+      const filter = { email: data.email };
+      const update = {
+        $set: { full_name: data.full_name, profile: data.profile },
+      };
+      const options = { upsert: true };
+      const updated = await usersCollection.updateOne(filter, update, options);
+      res.send(updated);
+    });
+
+    // create employee : hit by employee
     app.post("/users/employee", async (req, res) => {
       const data = req.body;
+      const employeeExits = await usersCollection.findOne({
+        email: data.email,
+      });
+      if (employeeExits) {
+        return res.send({ insertedId: true });
+      }
       const newData = { ...data, role: "EMPLOYEE", verified: false };
       const result = await usersCollection.insertOne(newData);
       res.send(result);
@@ -196,6 +233,16 @@ async function run() {
       res.send(result);
     });
 
+    // rejected : hit by HR
+    app.patch("/request/rejected/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await requestCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "pending", approval_date: null } }
+      );
+      res.send(result);
+    });
+
     //all  employee
     app.get(
       "/users/all-employees/:email",
@@ -212,6 +259,24 @@ async function run() {
         }
       }
     );
+
+    // remove employee : hit by hr
+    app.delete("/employee/remove/:id", async (req, res) => {
+      const id = req.params.id;
+      const company = req.query.company;
+      const decreaseMember = await usersCollection.updateOne(
+        {
+          company_name: company,
+          role: "HR",
+        },
+        {
+          $inc: { members: -1 },
+        }
+      );
+      const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+
     //all team member
     app.get("/request/team", verifyToken, async (req, res) => {
       const company = req.query.company;
@@ -221,9 +286,16 @@ async function run() {
       res.send(teams);
     });
 
-    //edit  verified employee
+    //edit verified employee : hit by HR
     app.put("/users/verified_employee/:id", async (req, res) => {
       const id = req.params.id;
+      const company = req.query.company;
+      const decrementMember = await usersCollection.updateOne(
+        { company_name: company, role: "HR" },
+        {
+          $inc: { members: -1 },
+        }
+      );
       const employee = await usersCollection.findOne({ _id: new ObjectId(id) });
       let verified = employee.verified ? false : true;
       const result = await usersCollection.updateOne(
@@ -244,7 +316,8 @@ async function run() {
     });
     // all assets
     app.get("/assets", async (req, res) => {
-      const result = await assetsCollection.find({}).toArray();
+      const company = req.query.company;
+      const result = await assetsCollection.find({company_name:company}).toArray();
       res.send(result);
     });
     // search volunteers by title and category
@@ -289,12 +362,6 @@ async function run() {
       res.send(result);
     });
 
-    // get assets by id
-    // app.get("/assets/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const result = await assetsCollection.findOne({ _id: new ObjectId(id) });
-    //   res.send(result);
-    // });
     // edit assets
     /******************************* assets ******************************************/
 
@@ -303,6 +370,14 @@ async function run() {
     app.post("/request", verifyToken, verifyEmployee, async (req, res) => {
       const data = req.body;
       const assets_id = data.assets_id;
+      const total = await requestCollection.countDocuments({
+        status: "pending",
+      });
+
+      if (total > 5) {
+        return res.send({ message: "Already 5 item requested, please wait" });
+      }
+
       const decreaseAssets = await assetsCollection.updateOne(
         {
           _id: new ObjectId(assets_id),
@@ -318,7 +393,28 @@ async function run() {
     // all request
     app.get("/request", async (req, res) => {
       const email = req.query.email;
-      const result = await requestCollection.find().toArray();
+      const result = await requestCollection
+        .find({ "requestor.email": email })
+        .toArray();
+      res.send(result);
+    });
+
+    // cancel request
+    app.delete("/request/cancel/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await requestCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    // return request assets
+    app.put("/request/return/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await requestCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status: "returned" } }
+      );
       res.send(result);
     });
 
@@ -343,9 +439,53 @@ async function run() {
       const result = await requestCollection.find(query).toArray();
       res.send(result);
     });
+
+    // hr stat
+    app.get("/request-stat", async (req, res) => {
+      const total = await requestCollection.estimatedDocumentCount();
+      const returnableCount = await requestCollection.countDocuments({
+        type: "returnable",
+      });
+      const nonReturnableCount = await requestCollection.countDocuments({
+        type: "non-returnable",
+      });
+
+      const returnablePercentage = (returnableCount / total) * 100;
+      const nonReturnablePercentage = (nonReturnableCount / total) * 100;
+
+      res.send({
+        returnablePercentage: returnablePercentage.toFixed(2),
+        nonReturnablePercentage: nonReturnablePercentage.toFixed(2),
+        total: total,
+      });
+    });
     /******************************* request ******************************************/
 
-    await client.db("admin").command({ ping: 1 });
+    /******************************* notice ******************************************/
+    // add notice
+    app.patch("/notice", async (req, res) => {
+      const data = req.body;
+      const filter = { company_name: data.company_name };
+      const update = {
+        $set: {
+          company_name: data.company_name,
+          notice: data.notice,
+        },
+      };
+      const options = { upsert: true };
+      const result = await noticeCollection.updateOne(filter, update, options);
+      res.send(result);
+    });
+    // all notice
+    app.get("/notice", async (req, res) => {
+      const company = req.query.company;
+      console.log(company);
+      const result = await noticeCollection.findOne({ company_name: company });
+      res.send(result);
+    });
+    /******************************* notice ******************************************/
+
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
