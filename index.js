@@ -8,6 +8,16 @@ const port = process.env.PORT || 8000;
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe = require("stripe")(stripeSecret);
 
+// middleware
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://smart-com-415d1.web.app",
+      "https://smart-com-415d1.firebaseapp.com",
+    ],
+  })
+);
 app.use(cors());
 app.use(express.json());
 
