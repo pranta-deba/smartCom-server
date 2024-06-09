@@ -327,7 +327,9 @@ async function run() {
     // all assets
     app.get("/assets", async (req, res) => {
       const company = req.query.company;
-      const result = await assetsCollection.find({company_name:company}).toArray();
+      const result = await assetsCollection
+        .find({ company_name: company })
+        .toArray();
       res.send(result);
     });
     // search volunteers by title and category
@@ -452,16 +454,23 @@ async function run() {
 
     // hr stat
     app.get("/request-stat", async (req, res) => {
-      const total = await requestCollection.estimatedDocumentCount();
+      const company = req.query.company;
+      const total = await requestCollection.countDocuments({
+        "requestor.company_name": company,
+      });
       const returnableCount = await requestCollection.countDocuments({
+        "requestor.company_name": company,
         type: "returnable",
       });
       const nonReturnableCount = await requestCollection.countDocuments({
+        "requestor.company_name": company,
         type: "non-returnable",
       });
 
       const returnablePercentage = (returnableCount / total) * 100;
       const nonReturnablePercentage = (nonReturnableCount / total) * 100;
+
+      console.log(company,total, returnableCount,nonReturnableCount);
 
       res.send({
         returnablePercentage: returnablePercentage.toFixed(2),
